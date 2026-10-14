@@ -1,0 +1,489 @@
+(function(Scratch) {
+  'use strict';
+
+  if (!Scratch.extensions.unsandboxed) {
+    throw new Error('Cette extension nécessite d\'être exécutée hors sandbox.');
+  }
+
+  class SalonProPublicExtension {
+    constructor() {
+      this.owner = 'Kaliflo20-dev';
+      this.repo = 'salon-turbowarp';
+      this.token = '';
+      this.isConnected = false;
+      this.isLocalMode = false;
+      this.localFiles = {}; // Stockage simulé en local pour les tests
+    }
+
+    getInfo() {
+      return {
+        id: 'salonpropublic',
+        name: 'Salon GitHub Public',
+        color1: '#24292E',
+        color2: '#1F2428',
+        blocks: [
+          // --- Connexion & Mode Local (Commandes / Booléens) ---
+          {
+            opcode: 'connectServer',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'se connecter au serveur avec la clé API [TOKEN]',
+            arguments: {
+              TOKEN: { type: Scratch.ArgumentType.STRING, defaultValue: 'Ghp_...' }
+            }
+          },
+          {
+            opcode: 'disconnectServer',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'se déconnecter du serveur'
+          },
+          {
+            opcode: 'isServerConnected',
+            blockType: Scratch.BlockType.BOOLEAN,
+            text: 'serveur connecté ?'
+          },
+          {
+            opcode: 'setLocalMode',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'mettre à test local [STATE]',
+            arguments: {
+              STATE: { type: Scratch.ArgumentType.STRING, menu: 'boolMenu', defaultValue: 'vrai' }
+            }
+          },
+          {
+            opcode: 'isLocalModeOn',
+            blockType: Scratch.BlockType.BOOLEAN,
+            text: 'mode local est-il enclenché ?'
+          },
+
+          '---',
+
+          // --- Gestion globale des Fichiers ---
+          {
+            opcode: 'createFile',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'créer un fichier [FILENAME]',
+            arguments: {
+              FILENAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'mon_fichier.txt' }
+            }
+          },
+          {
+            opcode: 'deleteFile',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'supprimer un fichier [FILENAME]',
+            arguments: {
+              FILENAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'mon_fichier.txt' }
+            }
+          },
+          {
+            opcode: 'setFileContent',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'mettre fichier [FILENAME] à [CONTENT]',
+            arguments: {
+              FILENAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'mon_fichier.txt' },
+              CONTENT: { type: Scratch.ArgumentType.STRING, defaultValue: 'Nouveau contenu global' }
+            }
+          },
+          {
+            opcode: 'appendToFile',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'ajouter à un fichier [FILENAME] : [CONTENT]',
+            arguments: {
+              FILENAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'mon_fichier.txt' },
+              CONTENT: { type: Scratch.ArgumentType.STRING, defaultValue: 'Ligne ajoutée à la suite' }
+            }
+          },
+          {
+            opcode: 'getFileWeight',
+            blockType: Scratch.BlockType.REPORTER,
+            text: 'poids de la mémoire [FILENAME] (ko)',
+            arguments: {
+              FILENAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'mon_fichier.txt' }
+            }
+          },
+          {
+            opcode: 'getFileContent',
+            blockType: Scratch.BlockType.REPORTER,
+            text: 'code de la mémoire [FILENAME]',
+            arguments: {
+              FILENAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'mon_fichier.txt' }
+            }
+          },
+          {
+            opcode: 'memoryExists',
+            blockType: Scratch.BlockType.BOOLEAN,
+            text: 'mémoire [FILENAME] existe ?',
+            arguments: {
+              FILENAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'mon_fichier.txt' }
+            }
+          },
+
+          '---',
+
+          // --- Gestion des Tableaux JSON ---
+          {
+            opcode: 'createJsonTable',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'créer un fichier de tableau JSON [TABNAME]',
+            arguments: {
+              TABNAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'tableau.json' }
+            }
+          },
+          {
+            opcode: 'deleteJsonTable',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'supprimer un fichier de tableau JSON [TABNAME]',
+            arguments: {
+              TABNAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'tableau.json' }
+            }
+          },
+          {
+            opcode: 'setJsonTableContent',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'mettre fichier de tableau JSON [TABNAME] à [JSONCODE]',
+            arguments: {
+              TABNAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'tableau.json' },
+              JSONCODE: { type: Scratch.ArgumentType.STRING, defaultValue: '["item1", "item2"]' }
+            }
+          },
+          {
+            opcode: 'appendToJsonTable',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'ajouter [ITEM] en position [POS] du tableau [TABNAME]',
+            arguments: {
+              ITEM: { type: Scratch.ArgumentType.STRING, defaultValue: 'Mon nouvel élément' },
+              POS: { type: Scratch.ArgumentType.STRING, defaultValue: 'dernier' },
+              TABNAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'tableau.json' }
+            }
+          },
+          {
+            opcode: 'deleteFromJsonTableByIndex',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'supprimer l\'élément [INDEX] du tableau [TABNAME]',
+            arguments: {
+              INDEX: { type: Scratch.ArgumentType.NUMBER, defaultValue: 1 },
+              TABNAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'tableau.json' }
+            }
+          },
+          {
+            opcode: 'deleteFromJsonTableByKeyword',
+            blockType: Scratch.BlockType.COMMAND,
+            text: 'supprimer l\'élément contenant [KEYWORD] du tableau [TABNAME]',
+            arguments: {
+              KEYWORD: { type: Scratch.ArgumentType.STRING, defaultValue: 'mot_cle' },
+              TABNAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'tableau.json' }
+            }
+          },
+          {
+            opcode: 'jsonTableContains',
+            blockType: Scratch.BlockType.BOOLEAN,
+            text: 'tableau [TABNAME] contient [KEYWORD]',
+            arguments: {
+              TABNAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'tableau.json' },
+              KEYWORD: { type: Scratch.ArgumentType.STRING, defaultValue: 'mot_cle' }
+            }
+          },
+          {
+            opcode: 'getJsonTableContent',
+            blockType: Scratch.BlockType.REPORTER,
+            text: 'code JSON de tableau [TABNAME]',
+            arguments: {
+              TABNAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'tableau.json' }
+            }
+          },
+          {
+            opcode: 'getElementPositionInTable',
+            blockType: Scratch.BlockType.REPORTER,
+            text: 'position élément [ITEM] de tableau [TABNAME]',
+            arguments: {
+              ITEM: { type: Scratch.ArgumentType.STRING, defaultValue: 'mon_element' },
+              TABNAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'tableau.json' }
+            }
+          },
+          {
+            opcode: 'getElementByPosition',
+            blockType: Scratch.BlockType.REPORTER,
+            text: 'élément [INDEX] du tableau [TABNAME]',
+            arguments: {
+              INDEX: { type: Scratch.ArgumentType.NUMBER, defaultValue: 1 },
+              TABNAME: { type: Scratch.ArgumentType.STRING, defaultValue: 'tableau.json' }
+            }
+          }
+        ],
+        menus: {
+          boolMenu: {
+            acceptReporters: true,
+            items: ['vrai', 'faux']
+          }
+        }
+      };
+    }
+
+    // --- Utilitaires Internes GitHub / Local ---
+
+    async _fetchFile(filename) {
+      if (this.isLocalMode) {
+        if (this.localFiles[filename] !== undefined) {
+          return { content: btoa(unescape(encodeURIComponent(this.localFiles[filename]))), sha: 'local-sha' };
+        }
+        return { content: null, sha: null };
+      }
+
+      if (!this.token) throw new Error('Non connecté');
+      const url = `https://api.github.com/repos/${this.owner}/${this.repo}/contents/${filename}`;
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `token ${this.token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+      if (!res.ok) return { content: null, sha: null };
+      return await res.json();
+    }
+
+    async _saveFile(filename, content, message) {
+      if (this.isLocalMode) {
+        this.localFiles[filename] = content;
+        return;
+      }
+
+      const fileData = await this._fetchFile(filename);
+      const encoded = btoa(unescape(encodeURIComponent(content)));
+      const url = `https://api.github.com/repos/${this.owner}/${this.repo}/contents/${filename}`;
+      const body = { message: message, content: encoded };
+      if (fileData.sha && fileData.sha !== 'local-sha') body.sha = fileData.sha;
+
+      await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${this.token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github.v3+json'
+        },
+        body: JSON.stringify(body)
+      });
+    }
+
+    // --- Implémentation Blocs : Connexion / Local ---
+
+    async connectServer(args) {
+      this.token = String(args.TOKEN).trim();
+      try {
+        const res = await fetch(`https://api.github.com/repos/${this.owner}/${this.repo}`, {
+          headers: { 'Authorization': `token ${this.token}` }
+        });
+        this.isConnected = res.ok;
+      } catch (e) {
+        this.isConnected = false;
+      }
+    }
+
+    disconnectServer() {
+      this.token = '';
+      this.isConnected = false;
+    }
+
+    isServerConnected() {
+      return this.isConnected && !this.isLocalMode;
+    }
+
+    setLocalMode(args) {
+      const state = String(args.STATE).toLowerCase().trim();
+      this.isLocalMode = (state === 'vrai' || state === 'true' || state === '1');
+    }
+
+    isLocalModeOn() {
+      return this.isLocalMode;
+    }
+
+    // --- Implémentation Blocs : Fichiers Globaux ---
+
+    async createFile(args) {
+      const filename = String(args.FILENAME).trim();
+      const fileData = await this._fetchFile(filename);
+      if (!fileData.sha) {
+        await this._saveFile(filename, '', `Création fichier ${filename}`);
+      }
+    }
+
+    async deleteFile(args) {
+      const filename = String(args.FILENAME).trim();
+      if (this.isLocalMode) {
+        delete this.localFiles[filename];
+        return;
+      }
+      const fileData = await this._fetchFile(filename);
+      if (fileData.sha) {
+        const url = `https://api.github.com/repos/${this.owner}/${this.repo}/contents/${filename}`;
+        await fetch(url, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `token ${this.token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/vnd.github.v3+json'
+          },
+          body: JSON.stringify({ message: `Suppression ${filename}`, sha: fileData.sha })
+        });
+      }
+    }
+
+    async setFileContent(args) {
+      const filename = String(args.FILENAME).trim();
+      const content = String(args.CONTENT);
+      await this._saveFile(filename, content, `Mise à jour de ${filename}`);
+    }
+
+    async appendToFile(args) {
+      const filename = String(args.FILENAME).trim();
+      const addition = String(args.CONTENT);
+      const fileData = await this._fetchFile(filename);
+      let current = '';
+      if (fileData.content) {
+        current = decodeURIComponent(escape(atob(fileData.content)));
+      }
+      const updated = current + '\n' + addition;
+      await this._saveFile(filename, updated, `Ajout dans ${filename}`);
+    }
+
+    async getFileWeight(args) {
+      const filename = String(args.FILENAME).trim();
+      const fileData = await this._fetchFile(filename);
+      if (!fileData.content) return '0';
+      return (atob(fileData.content).length / 1024).toFixed(2);
+    }
+
+    async getFileContent(args) {
+      const filename = String(args.FILENAME).trim();
+      const fileData = await this._fetchFile(filename);
+      if (!fileData.content) return '';
+      return decodeURIComponent(escape(atob(fileData.content)));
+    }
+
+    async memoryExists(args) {
+      const filename = String(args.FILENAME).trim();
+      const fileData = await this._fetchFile(filename);
+      return fileData.sha !== null && fileData.sha !== undefined;
+    }
+
+    // --- Implémentation Blocs : Tableaux JSON ---
+
+    async createJsonTable(args) {
+      const tabName = String(args.TABNAME).trim();
+      await this._saveFile(tabName, '[]', `Création tableau JSON ${tabName}`);
+    }
+
+    async deleteJsonTable(args) {
+      await this.deleteFile({ FILENAME: args.TABNAME });
+    }
+
+    async setJsonTableContent(args) {
+      const tabName = String(args.TABNAME).trim();
+      const code = String(args.JSONCODE);
+      await this._saveFile(tabName, code, `Mise à jour tableau JSON ${tabName}`);
+    }
+
+    async appendToJsonTable(args) {
+      const tabName = String(args.TABNAME).trim();
+      const item = String(args.ITEM);
+      const pos = String(args.POS).toLowerCase().trim();
+
+      const fileData = await this._fetchFile(tabName);
+      let arr = [];
+      try {
+        if (fileData.content) {
+          arr = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
+          if (!Array.isArray(arr)) arr = [];
+        }
+      } catch (e) { arr = []; }
+
+      if (pos === 'premier' || pos === '1') {
+        arr.unshift(item);
+      } else {
+        arr.push(item);
+      }
+
+      await this._saveFile(tabName, JSON.stringify(arr, null, 2), `Ajout élément dans tableau ${tabName}`);
+    }
+
+    async deleteFromJsonTableByIndex(args) {
+      const tabName = String(args.TABNAME).trim();
+      const index = parseInt(args.INDEX) - 1;
+
+      const fileData = await this._fetchFile(tabName);
+      try {
+        if (!fileData.content) return;
+        let arr = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
+        if (Array.isArray(arr) && index >= 0 && index < arr.length) {
+          arr.splice(index, 1);
+          await this._saveFile(tabName, JSON.stringify(arr, null, 2), `Suppression index ${args.INDEX} dans ${tabName}`);
+        }
+      } catch (e) {}
+    }
+
+    async deleteFromJsonTableByKeyword(args) {
+      const tabName = String(args.TABNAME).trim();
+      const kw = String(args.KEYWORD).toLowerCase().trim();
+
+      const fileData = await this._fetchFile(tabName);
+      try {
+        if (!fileData.content) return;
+        let arr = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
+        if (Array.isArray(arr)) {
+          arr = arr.filter(el => !String(el).toLowerCase().includes(kw));
+          await this._saveFile(tabName, JSON.stringify(arr, null, 2), `Suppression mot-clé dans ${tabName}`);
+        }
+      } catch (e) {}
+    }
+
+    async jsonTableContains(args) {
+      const tabName = String(args.TABNAME).trim();
+      const kw = String(args.KEYWORD).toLowerCase().trim();
+
+      const fileData = await this._fetchFile(tabName);
+      try {
+        if (!fileData.content) return false;
+        let arr = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
+        if (Array.isArray(arr)) {
+          return arr.some(el => String(el).toLowerCase().includes(kw));
+        }
+      } catch (e) {}
+      return false;
+    }
+
+    async getJsonTableContent(args) {
+      return await this.getFileContent({ FILENAME: args.TABNAME });
+    }
+
+    async getElementPositionInTable(args) {
+      const tabName = String(args.TABNAME).trim();
+      const target = String(args.ITEM).toLowerCase().trim();
+
+      const fileData = await this._fetchFile(tabName);
+      try {
+        if (!fileData.content) return 0;
+        let arr = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
+        if (Array.isArray(arr)) {
+          const idx = arr.findIndex(el => String(el).toLowerCase().includes(target));
+          return idx !== -1 ? idx + 1 : 0;
+        }
+      } catch (e) {}
+      return 0;
+    }
+
+    async getElementByPosition(args) {
+      const tabName = String(args.TABNAME).trim();
+      const index = parseInt(args.INDEX) - 1;
+
+      const fileData = await this._fetchFile(tabName);
+      try {
+        if (!fileData.content) return '';
+        let arr = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
+        if (Array.isArray(arr) && index >= 0 && index < arr.length) {
+          return String(arr[index]);
+        }
+      } catch (e) {}
+      return '';
+    }
+  }
+
+  Scratch.extensions.register(new SalonProPublicExtension());
+})(Scratch);
